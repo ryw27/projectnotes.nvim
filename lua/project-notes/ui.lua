@@ -13,12 +13,14 @@ function M.show(file_path)
 	end
 
 	-- Create a clean scratch buffer
-	M.buf_id = vim.api.nvim_create_buf(false, true)
+	if not M.buf_id or not vim.api.nvim_buf_is_valid(M.buf_id) then
+		M.buf_id = vim.api.nvim_create_buf(false, true)
+	end
 
 	-- Assign the actual file path to this buffer
 	vim.api.nvim_buf_set_name(M.buf_id, file_path)
 
-	-- Load the file contents into the buffer natively
+	-- Load the file contents into the buffer
 	vim.fn.bufload(M.buf_id)
 
 	if config.options.ui_style == "float" then
@@ -42,10 +44,23 @@ function M.show(file_path)
 
 		-- Open the window and focus it
 		M.win_id = vim.api.nvim_open_win(M.buf_id, true, win_opts)
+	elseif config.options.ui_style == "vsplit" then
+		local win_opts = {
+			split = "right",
+		}
+		M.win_id = vim.api.nvim_open_win(M.buf_id, true, win_opts)
+	elseif config.options.ui_style == "hsplit" then
+		local win_opts = {
+			split = "below",
+		}
+		M.win_id = vim.api.nvim_open_win(M.buf_id, true, win_opts)
+	else
+		vim.notify("Invalid projectnotes UI style", vim.log.levels.ERROR)
 	end
 
 	-- Set the filetype to markdown so syntax highlighting works instantly
 	vim.bo[M.buf_id].filetype = "markdown"
+	vim.wo[M.win_id].wrap = true
 end
 
 function M.close()
