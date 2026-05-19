@@ -1,1 +1,1 @@
-# project-notes.nvim
+# projectnotes.nvim
