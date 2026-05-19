@@ -5,6 +5,25 @@ M.win_id = nil
 
 local config = require("projectnotes.config")
 
+local function setup_autocmds()
+	local bufnr = M.buf_id
+	vim.keymap.set("n", "q", function()
+		require("projectnotes").close_note()
+	end, { buffer = bufnr, silent = true, desc = "Close project note" })
+
+	-- Create an event listener that auto-closes the window if they click away
+	local group_id = vim.api.nvim_create_augroup("ProjectNotesLocal", { clear = true })
+
+	vim.api.nvim_create_autocmd({ "BufLeave", "WinLeave" }, {
+		group = group_id,
+		buffer = bufnr, -- Only triggers when leaving THIS specific buffer
+		callback = function()
+			-- We use schedule to defer the execution safely outside the event loop split
+			vim.schedule(M.close)
+		end,
+	})
+end
+
 function M.show(file_path)
 	-- If window is already open, just jump into it
 	if M.win_id and vim.api.nvim_win_is_valid(M.win_id) then
@@ -44,6 +63,7 @@ function M.show(file_path)
 
 		-- Open the window and focus it
 		M.win_id = vim.api.nvim_open_win(M.buf_id, true, win_opts)
+		setup_autocmds()
 	elseif config.options.ui_style == "vsplit" then
 		local win_opts = {
 			split = "right",
