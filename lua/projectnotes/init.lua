@@ -22,6 +22,10 @@ local function check_existence(cwd)
 	return nil
 end
 
+function M.setup(user_opts)
+	require("projectnotes.config").setup(user_opts)
+end
+
 -- map_data: {
 -- cwd: note_file_path,
 -- cwd: note_file_path
@@ -57,19 +61,25 @@ end
 -- Allows note linking. Will automatically change despite existing linked note
 function M.link_note()
 	local cwd = vim.fn.getcwd()
-	local note_file = check_existence(cwd)
-
-	if not note_file then
-		mapper.delete_entry(cwd)
-	end
+	local current_path = check_existence(cwd)
 
 	-- Find a file in the notes dir to link to
 	-- local note_files = vim.split(vim.fn.glob(config.options.notes_dir .. "/*.md"), "\n")
 	fzf.find_note_to_link(cwd, function(selected)
+		-- Will delete an old entry itself
 		mapper.create_manual_entry(selected)
 	end)
 
 	vim.notify("Note successfully linked", vim.log.levels.INFO, {})
+
+	-- Clear the old note buffer if it is open
+	local current_buf_path = vim.fn.expand("%:p")
+	if current_buf_path == current_path then
+		local old_bufnr = vim.fn.bufnr(current_path)
+		if old_bufnr ~= -1 then
+			vim.cmd("bwipeout " .. old_bufnr)
+		end
+	end
 end
 
 function M.rename_note(new_name)
