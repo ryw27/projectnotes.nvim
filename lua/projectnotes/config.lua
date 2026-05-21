@@ -4,16 +4,16 @@ local M = {}
 
 local defaults = {
 	notes_dir = vim.fn.expand("~/notes/projects"),
-	ui_style = "float", -- "float", "vsplit", or "hsplit"
+	-- Denotes project note opened
+	ui_style_proj = "float", -- "float", "vsplit", or "hsplit"
+	-- Denotes notes opened by search/grep
+	ui_style_general = "float", -- "float", "vsplit", or "hsplit"
+	picker = "auto", -- "auto", "fzf", or "builtin"
 	root_markers = { ".git", "Makefile", "package.json" },
-	auto_namer = function(cwd)
-		if not cwd then
-			return ""
-		end
-
-		string.gsub(cwd, "/", "%")
-
-		return cwd .. ".md"
+	resolve_root = nil, -- optional function() -> project root path
+	auto_namer = function(project_root)
+		local pathname = project_root:gsub("/", "%%")
+		return M.options.notes_dir .. "/" .. pathname .. ".md"
 	end,
 }
 
