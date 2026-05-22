@@ -1,6 +1,6 @@
 local M = {}
 
-local popup = require("plenary.popup")
+local float = require("plenary.window.float")
 local window = require("plenary.window")
 local config = require("projectnotes.config")
 
@@ -49,10 +49,8 @@ function M.show(file_path)
 
 	local style = config.options.ui_style_proj
 	if style == "float" then
-		M.win_id = popup.create(M.buf_id, {
-			relative = "editor",
-			border = true,
-		})
+		local win = float.centered({ bufnr = M.buf_id })
+		M.win_id = win.win_id
 	elseif style == "vsplit" or style == "hsplit" then
 		M.win_id = vim.api.nvim_open_win(M.buf_id, true, { split = style == "vsplit" and "right" or "below" })
 		vim.wo[M.win_id].wrap = true
@@ -67,8 +65,8 @@ end
 function M.close()
 	if M.buf_id and vim.api.nvim_buf_is_valid(M.buf_id) then
 		save(M.buf_id)
-		vim.api.nvim_buf_delete(M.buf_id, { force = true })
 	end
+	float.clear(M.buf_id)
 	if M.win_id and vim.api.nvim_win_is_valid(M.win_id) then
 		window.try_close(M.win_id, true)
 	end
