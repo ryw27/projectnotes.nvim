@@ -48,9 +48,10 @@ function M.find_notes(notes_dir)
 		return
 	end
 
+	local ui = require("projectnotes.ui")
 	local files = list_note_files(notes_dir)
 	builtin_select(files, "Project Notes> ", notes_dir, function(choice)
-		vim.cmd.edit(vim.fn.fnameescape(choice))
+		ui.show(choice, "general")
 	end)
 end
 

@@ -52,7 +52,7 @@ function M.open_note_auto()
 end
 
 function M.close_note()
-	render.close()
+	render.close_float()
 end
 
 function M.open_note_manual()
