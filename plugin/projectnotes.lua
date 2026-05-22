@@ -4,40 +4,40 @@ vim.api.nvim_create_user_command("ProjectNote", function()
 	projectnotes.open_note_auto()
 end, {
 	nargs = 0,
-	desc = "Create a project note in the notes dir using the auto namer fn if it doesn't exist and opens it, else opens it",
+	desc = "Open or create the note for the current project (auto-named)",
 })
 
 vim.api.nvim_create_user_command("ProjectNoteManual", function()
 	projectnotes.open_note_manual()
 end, {
 	nargs = 0,
-	desc = "Create a project note in the notes dir with a manual prompt if it doesn't exist",
+	desc = "Create a project note with a custom filename",
 })
 
-vim.api.nvim_create_user_command("ProjectNoteRename", function()
-	projectnotes.rename_note()
+vim.api.nvim_create_user_command("ProjectNoteRename", function(opts)
+	projectnotes.rename_note(opts.args)
 end, {
-	nargs = 0,
-	desc = "Prompts for a corresponding note rename if a note exists",
+	nargs = "?",
+	desc = "Rename the note linked to the current project",
 })
 
-vim.api.nvim_create_user_command("ProjectNoteRename", function()
+vim.api.nvim_create_user_command("ProjectNoteLink", function()
 	projectnotes.link_note()
 end, {
 	nargs = 0,
-	desc = "Opens a picker to link a new note to a project",
+	desc = "Link an existing note file to the current project",
 })
 
-vim.api.nvim_create_user_command("ProjectNote", function()
+vim.api.nvim_create_user_command("ProjectNotes", function()
 	projectnotes.search_notes()
 end, {
 	nargs = 0,
-	desc = "Search notes dir",
+	desc = "Search notes in the notes directory",
 })
 
-vim.api.nvim_create_user_command("ProjectNote", function()
+vim.api.nvim_create_user_command("ProjectNotesGrep", function()
 	projectnotes.grep_notes()
 end, {
 	nargs = 0,
-	desc = "Grep notes dir",
+	desc = "Grep notes in the notes directory",
 })
