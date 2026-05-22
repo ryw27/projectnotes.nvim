@@ -22,6 +22,11 @@ function M.setup(user_opts)
 		error("projectnotes needs Neovim >= 0.8.0.")
 	end
 
+	local ok = pcall(require, "plenary.popup")
+	if not ok then
+		error("projectnotes.nvim requires plenary.nvim (https://github.com/nvim-lua/plenary.nvim)")
+	end
+
 	M.options = vim.tbl_deep_extend("force", defaults, user_opts or {})
 
 	if vim.fn.isdirectory(M.options.notes_dir) == 0 then
