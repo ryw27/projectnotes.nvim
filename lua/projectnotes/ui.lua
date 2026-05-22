@@ -47,7 +47,7 @@ function M.show(file_path)
 		vim.api.nvim_buf_set_lines(M.buf_id, 0, -1, false, { "" })
 	end
 
-	if config.options.ui_style == "float" then
+	if config.options.ui_style_proj == "float" then
 		local screen_width = vim.o.columns
 		local screen_height = vim.o.lines
 		local win_width = math.ceil(screen_width * 0.6)
@@ -65,10 +65,10 @@ function M.show(file_path)
 			border = "rounded",
 		})
 		setup_autocmds()
-	elseif config.options.ui_style == "vsplit" then
+	elseif config.options.ui_style_proj == "vsplit" then
 		M.win_id = vim.api.nvim_open_win(M.buf_id, true, { split = "right" })
 		setup_autocmds()
-	elseif config.options.ui_style == "hsplit" then
+	elseif config.options.ui_style_proj == "hsplit" then
 		M.win_id = vim.api.nvim_open_win(M.buf_id, true, { split = "below" })
 		setup_autocmds()
 	else
