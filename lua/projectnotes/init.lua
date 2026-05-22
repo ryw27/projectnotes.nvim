@@ -3,18 +3,31 @@ local M = {}
 local config = require("projectnotes.config")
 local mapper = require("projectnotes.map")
 local render = require("projectnotes.ui")
-local fzf = require("projectnotes.providers.fzf")
+local picker = require("projectnotes.picker")
 
--- Returns file and mapdata entry (empty if not manual)
-local function check_existence(cwd)
+local function project_root()
+	if config.options.resolve_root then
+		local resolved = config.options.resolve_root()
+		if resolved and resolved ~= "" then
+			resolved = vim.fn.fnamemodify(resolved, ":p")
+			if #resolved > 1 and resolved:sub(-1) == "/" then
+				resolved = resolved:sub(1, -2)
+			end
+			return resolved
+		end
+	end
+	return mapper.resolve(config.options.root_markers)
+end
+
+local function check_existence(project_root_path)
 	local mapdata = mapper.read_map()
-	local mapped_path = mapdata[cwd]
+	local mapped_path = mapdata[project_root_path]
 
 	if mapped_path and vim.fn.filereadable(mapped_path) == 1 then
 		return mapped_path
 	end
 
-	local auto_fp = config.options.auto_namer(cwd)
+	local auto_fp = config.options.auto_namer(project_root_path)
 	if vim.fn.filereadable(auto_fp) == 1 then
 		return auto_fp
 	end
@@ -24,19 +37,15 @@ end
 
 function M.setup(user_opts)
 	require("projectnotes.config").setup(user_opts)
+	require("projectnotes.map").migrate()
 end
 
--- map_data: {
--- cwd: note_file_path,
--- cwd: note_file_path
--- }
 function M.open_note_auto()
-	local cwd = vim.fn.getcwd()
-	local note_file = check_existence(cwd)
+	local proj = project_root()
+	local note_file = check_existence(proj)
 
 	if not note_file then
-		mapper.delete_entry(cwd)
-		note_file = mapper.create_auto_entry(cwd)
+		note_file = mapper.create_auto_entry(proj)
 	end
 
 	render.show(note_file)
@@ -47,56 +56,85 @@ function M.close_note()
 end
 
 function M.open_note_manual()
-	local cwd = vim.fn.getcwd()
-	local note_file = check_existence(cwd)
+	local proj = project_root()
+	local note_file = check_existence(proj)
 
-	if not note_file then
-		mapper.delete_entry(cwd)
-		note_file = mapper.create_manual_entry(cwd)
+	if note_file then
+		render.show(note_file)
+		return
 	end
 
-	render.show(note_file)
+	vim.ui.input({ prompt = "Note filename: ", default = vim.fn.fnamemodify(proj, ":t") .. ".md" }, function(name)
+		if not name or name == "" then
+			return
+		end
+		if name:find("/", 1, true) then
+			vim.notify("Note name cannot contain /", vim.log.levels.ERROR)
+			return
+		end
+		if not name:match("%.md$") then
+			name = name .. ".md"
+		end
+		local file_path = config.options.notes_dir .. "/" .. name
+		if vim.fn.filereadable(file_path) == 1 then
+			mapper.create_manual_entry(proj, file_path)
+			render.show(file_path)
+			return
+		end
+		note_file = mapper.create_manual_entry(proj, file_path)
+		render.show(note_file)
+	end)
 end
 
 -- Allows note linking. Will automatically change despite existing linked note
 function M.link_note()
-	local cwd = vim.fn.getcwd()
-	local current_path = check_existence(cwd)
+	local proj = project_root()
+	local current_path = check_existence(proj)
 
-	-- Find a file in the notes dir to link to
-	-- local note_files = vim.split(vim.fn.glob(config.options.notes_dir .. "/*.md"), "\n")
-	fzf.find_note_to_link(cwd, function(selected)
-		-- Will delete an old entry itself
-		mapper.create_manual_entry(selected)
-	end)
-
-	vim.notify("Note successfully linked", vim.log.levels.INFO, {})
-
-	-- Clear the old note buffer if it is open
-	local current_buf_path = vim.fn.expand("%:p")
-	if current_buf_path == current_path then
-		local old_bufnr = vim.fn.bufnr(current_path)
-		if old_bufnr ~= -1 then
-			vim.cmd("bwipeout " .. old_bufnr)
+	picker.find_note_to_link(config.options.notes_dir, function(selected)
+		if not selected then
+			return
 		end
-	end
+		mapper.create_manual_entry(proj, selected)
+		render.show(selected)
+		vim.notify("Note linked to project", vim.log.levels.INFO)
+
+		-- Close the old buffer if it's open
+		if current_path then
+			local old_bufnr = vim.fn.bufnr(current_path)
+			if old_bufnr ~= -1 and vim.api.nvim_buf_get_name(0) == current_path then
+				vim.cmd.bwipeout(old_bufnr)
+			end
+		end
+	end)
 end
 
 function M.rename_note(new_name)
-	-- Invalid input
 	if not new_name or new_name == "" then
-		vim.notify("Please provide a new name for the note.", vim.log.levels.ERROR)
+		local proj = project_root()
+		local current_path = check_existence(proj)
+		if not current_path then
+			vim.notify("Note does not exist for this project", vim.log.levels.ERROR)
+			return
+		end
+		vim.ui.input({
+			prompt = "New note name: ",
+			default = vim.fn.fnamemodify(current_path, ":t"),
+		}, function(name)
+			M.rename_note(name)
+		end)
 		return
 	end
 
 	-- Don't allow nested paths
 	if string.find(new_name, "/") then
-		vim.notify("New name contains /", vim.log.levels.ERROR)
+		vim.notify("New name cannot contain /", vim.log.levels.ERROR)
+		return
 	end
 
 	-- Check existence
-	local cwd = vim.fn.getcwd()
-	local current_path = check_existence(cwd)
+	local proj = project_root()
+	local current_path = check_existence(proj)
 	if not current_path then
 		vim.notify("Note does not exist for this project", vim.log.levels.ERROR)
 		return
@@ -123,49 +161,25 @@ function M.rename_note(new_name)
 		return
 	end
 
-	mapper.create_mapping(new_path)
+	mapper.set_mapping(proj, new_path)
 
 	local current_buf_path = vim.fn.expand("%:p")
 	if current_buf_path == current_path then
-		vim.cmd("edit " .. vim.fn.fnameescape(new_path))
+		vim.cmd.edit(vim.fn.fnameescape(new_path))
 
 		local old_bufnr = vim.fn.bufnr(current_path)
 		if old_bufnr ~= -1 then
-			vim.cmd("bwipeout " .. old_bufnr)
+			vim.cmd.bwipeout(old_bufnr)
 		end
 	end
 end
 
 function M.search_notes()
-	fzf.find_notes(config.options.notes_dir)
-	-- local note_files = vim.split(vim.fn.glob(config.options.notes_dir .. "/*.md"), "\n", { trimempty = true })
-	--
-	-- vim.ui.select(note_files, {
-	-- 	prompt = "Select a note file",
-	-- 	format_item = function(item)
-	-- 		return vim.fn.fnamemodify(item, ":t")
-	-- 	end,
-	-- }, function(choice)
-	-- 	if choice then
-	-- 		vim.cmd("edit " .. vim.fn.fnameescape(choice))
-	-- 	end
-	-- end)
+	picker.find_notes(config.options.notes_dir)
 end
 
 function M.grep_notes()
-	fzf.grep_notes(config.options.notes_dir)
-	-- local note_files = vim.split(vim.fn.glob(config.options.notes_dir .. "/*.md"), "\n", { trimempty = true })
-	--
-	-- vim.ui.select(note_files, {
-	-- 	prompt = "Select a note file",
-	-- 	format_item = function(item)
-	-- 		return vim.fn.fnamemodify(item, ":t")
-	-- 	end,
-	-- }, function(choice)
-	-- 	if choice then
-	-- 		vim.cmd("edit " .. vim.fn.fnameescape(choice))
-	-- 	end
-	-- end)
+	picker.grep_notes(config.options.notes_dir)
 end
 
 return M
