@@ -19,6 +19,43 @@ local function project_root()
 	return mapper.resolve(config.options.root_markers)
 end
 
+local function notes_dir()
+	local dir = vim.fn.fnamemodify(config.options.notes_dir, ":p")
+	if #dir > 1 and dir:sub(-1) == "/" then
+		dir = dir:sub(1, -2)
+	end
+	return dir
+end
+
+local function in_notes_context()
+	local dir = notes_dir()
+	local start = vim.fn.fnamemodify(mapper.start_dir(), ":p")
+	if #start > 1 and start:sub(-1) == "/" then
+		start = start:sub(1, -2)
+	end
+	if start == dir or start:sub(1, #dir + 1) == dir .. "/" then
+		return true
+	end
+
+	local bufname = vim.api.nvim_buf_get_name(0)
+	if bufname ~= "" and vim.fn.fnamemodify(bufname, ":e") == "md" then
+		bufname = vim.fn.fnamemodify(bufname, ":p")
+		if bufname:sub(1, #dir + 1) == dir .. "/" then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function guard_project_note()
+	if in_notes_context() then
+		vim.notify("Cannot create a project note while in the notes directory", vim.log.levels.WARN)
+		return false
+	end
+	return true
+end
+
 local function check_existence(project_root_path)
 	local mapdata = mapper.read_map()
 	local mapped_path = mapdata[project_root_path]
@@ -41,6 +78,10 @@ function M.setup(user_opts)
 end
 
 function M.open_note_auto()
+	if not guard_project_note() then
+		return
+	end
+
 	local proj = project_root()
 	local note_file = check_existence(proj)
 
@@ -56,6 +97,10 @@ function M.close_note()
 end
 
 function M.open_note_manual()
+	if not guard_project_note() then
+		return
+	end
+
 	local proj = project_root()
 	local note_file = check_existence(proj)
 
@@ -88,6 +133,10 @@ end
 
 -- Allows note linking. Will automatically change despite existing linked note
 function M.link_note()
+	if not guard_project_note() then
+		return
+	end
+
 	local proj = project_root()
 	local current_path = check_existence(proj)
 
@@ -110,6 +159,10 @@ function M.link_note()
 end
 
 function M.rename_note(new_name)
+	if not guard_project_note() then
+		return
+	end
+
 	if not new_name or new_name == "" then
 		local proj = project_root()
 		local current_path = check_existence(proj)

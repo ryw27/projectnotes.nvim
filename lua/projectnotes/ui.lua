@@ -27,8 +27,8 @@ function M.close_float()
 		M.buf_id = nil
 		return
 	end
+
 	write_buf(M.buf_id)
-	float.clear(M.buf_id)
 	window.try_close(M.float_win_id, true)
 	M.float_win_id = nil
 	M.buf_id = nil
@@ -44,7 +44,6 @@ function M.show(file_path, kind)
 	end
 	vim.bo[buf].filetype = "markdown"
 
-	-- Already open somewhere: focus it, don't open again
 	local winnr = vim.fn.bufwinnr(buf)
 	if winnr > 0 then
 		vim.cmd(winnr .. "wincmd w")
@@ -65,15 +64,13 @@ function M.show(file_path, kind)
 	end
 
 	vim.keymap.set("n", "q", function()
-		local win = vim.api.nvim_get_current_win()
-		write_buf(buf)
-		float.clear(buf)
-		if win == M.float_win_id then
-			M.float_win_id = nil
-			M.buf_id = nil
-		end
-		if vim.api.nvim_win_is_valid(win) then
-			window.try_close(win, true)
+		if vim.api.nvim_get_current_win() == M.float_win_id then
+			M.close_float()
+		else
+			write_buf(buf)
+			if vim.api.nvim_win_is_valid(vim.api.nvim_get_current_win()) then
+				window.try_close(vim.api.nvim_get_current_win(), true)
+			end
 		end
 	end, { buffer = buf, desc = "Close note" })
 end

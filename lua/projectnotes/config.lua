@@ -22,7 +22,7 @@ function M.setup(user_opts)
 		error("projectnotes needs Neovim >= 0.8.0.")
 	end
 
-	local ok = pcall(require, "plenary.window.float")
+	local ok = pcall(require, "plenary.popup")
 	if not ok then
 		error("projectnotes.nvim requires plenary.nvim (https://github.com/nvim-lua/plenary.nvim)")
 	end
