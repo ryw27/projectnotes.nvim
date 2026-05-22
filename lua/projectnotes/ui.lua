@@ -11,39 +11,43 @@ local function setup_autocmds()
 		require("projectnotes").close_note()
 	end, { buffer = bufnr, silent = true, desc = "Close project note" })
 
-	-- Create an event listener that auto-closes the window if they click away
 	local group_id = vim.api.nvim_create_augroup("ProjectNotesLocal", { clear = true })
 
 	vim.api.nvim_create_autocmd({ "BufLeave", "WinLeave" }, {
 		group = group_id,
-		buffer = bufnr, -- Only triggers when leaving THIS specific buffer
+		buffer = bufnr,
 		callback = function()
-			-- We use schedule to defer the execution safely outside the event loop split
+			vim.api.nvim_buf_call(bufnr, function()
+				vim.cmd.write({ bang = false })
+			end)
 			vim.schedule(M.close)
 		end,
 	})
 end
 
 function M.show(file_path)
-	-- If window is already open, just jump into it
 	if M.win_id and vim.api.nvim_win_is_valid(M.win_id) then
 		vim.api.nvim_set_current_win(M.win_id)
 		return
 	end
 
-	-- Create a clean scratch buffer
-	if not M.buf_id or not vim.api.nvim_buf_is_valid(M.buf_id) then
-		M.buf_id = vim.api.nvim_create_buf(false, true)
+	if M.buf_id and vim.api.nvim_buf_is_valid(M.buf_id) then
+		vim.api.nvim_buf_delete(M.buf_id, { force = true })
 	end
 
-	-- Assign the actual file path to this buffer
+	M.buf_id = vim.api.nvim_create_buf(true, false)
 	vim.api.nvim_buf_set_name(M.buf_id, file_path)
+	vim.bo[M.buf_id].buftype = ""
+	vim.bo[M.buf_id].bufhidden = "hide"
 
-	-- Load the file contents into the buffer
-	vim.fn.bufload(M.buf_id)
+	if vim.fn.filereadable(file_path) == 1 then
+		local lines = vim.fn.readfile(file_path)
+		vim.api.nvim_buf_set_lines(M.buf_id, 0, -1, false, lines)
+	else
+		vim.api.nvim_buf_set_lines(M.buf_id, 0, -1, false, { "" })
+	end
 
 	if config.options.ui_style == "float" then
-		-- Calculate dimensions dynamically based on user's terminal size
 		local screen_width = vim.o.columns
 		local screen_height = vim.o.lines
 		local win_width = math.ceil(screen_width * 0.6)
@@ -51,7 +55,7 @@ function M.show(file_path)
 		local row = math.ceil((screen_height - win_height) / 2)
 		local col = math.ceil((screen_width - win_width) / 2)
 
-		local win_opts = {
+		M.win_id = vim.api.nvim_open_win(M.buf_id, true, {
 			relative = "editor",
 			row = row,
 			col = col,
@@ -59,37 +63,29 @@ function M.show(file_path)
 			height = win_height,
 			style = "minimal",
 			border = "rounded",
-		}
-
-		-- Open the window and focus it
-		M.win_id = vim.api.nvim_open_win(M.buf_id, true, win_opts)
+		})
 		setup_autocmds()
 	elseif config.options.ui_style == "vsplit" then
-		local win_opts = {
-			split = "right",
-		}
-		M.win_id = vim.api.nvim_open_win(M.buf_id, true, win_opts)
+		M.win_id = vim.api.nvim_open_win(M.buf_id, true, { split = "right" })
+		setup_autocmds()
 	elseif config.options.ui_style == "hsplit" then
-		local win_opts = {
-			split = "below",
-		}
-		M.win_id = vim.api.nvim_open_win(M.buf_id, true, win_opts)
+		M.win_id = vim.api.nvim_open_win(M.buf_id, true, { split = "below" })
+		setup_autocmds()
 	else
 		vim.notify("Invalid projectnotes UI style", vim.log.levels.ERROR)
+		return
 	end
 
-	-- Set the filetype to markdown so syntax highlighting works instantly
 	vim.bo[M.buf_id].filetype = "markdown"
 	vim.wo[M.win_id].wrap = true
 end
 
 function M.close()
 	if M.win_id and vim.api.nvim_win_is_valid(M.win_id) then
-		-- Close the window viewport
 		vim.api.nvim_win_close(M.win_id, true)
-		M.win_id = nil
-		M.buf_id = nil
 	end
+	M.win_id = nil
+	M.buf_id = nil
 end
 
 return M
